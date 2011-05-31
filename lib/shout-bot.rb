@@ -31,11 +31,11 @@ require "addressable/uri"
 require "socket"
 
 class ShoutBot
-  def self.shout(uri, password = nil, &block)
+  def self.shout(uri, password = nil, ssl = false, &block)
     raise ArgumentError unless block_given?
 
     uri = Addressable::URI.parse(uri)
-    irc = new(uri.host, uri.port, uri.user, uri.password) do |irc|
+    irc = new(uri.host, uri.port, uri.user, uri.password, ssl) do |irc|
       if channel = uri.fragment
         irc.join(channel, password, &block)
       else
@@ -47,10 +47,16 @@ class ShoutBot
 
   attr_accessor :channel
 
-  def initialize(server, port, nick, password=nil)
+  def initialize(server, port, nick, password = nil, ssl)
     raise ArgumentError unless block_given?
 
-    @socket = TCPSocket.open(server, port || 6667)
+    if ssl
+      @socket = OpenSSL::SSL::SSLSocket.new(TCPSocket.new(server, port || 6667), OpenSSL::SSL::SSLContext.new)
+      @socket.sync = true
+      @socket.connect
+    else
+      @socket = TCPSocket.open(server, port || 6667)
+    end
     @socket.puts "PASSWORD #{password}" if password
     @socket.puts "NICK #{nick}"
     @socket.puts "USER #{nick} #{nick} #{nick} :#{nick}"
@@ -60,7 +66,7 @@ class ShoutBot
     @socket.gets until @socket.eof?
   end
 
-  def join(channel, password = nil)
+  def join(channel, password)
     raise ArgumentError unless block_given?
 
     @channel = "##{channel}"
