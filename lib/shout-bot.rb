@@ -52,8 +52,10 @@ class ShoutBot
     raise ArgumentError unless block_given?
 
     if ssl
-      @socket = OpenSSL::SSL::SSLSocket.new(TCPSocket.new(server, port || 6667), OpenSSL::SSL::SSLContext.new)
-      @socket.sync = true
+      ssl_context = OpenSSL::SSL::SSLContext.new
+      ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      tcp_socket = TCPSocket.new(server, port || 6667)
+      @socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
       @socket.connect
     else
       @socket = TCPSocket.open(server, port || 6667)
