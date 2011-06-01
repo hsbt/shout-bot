@@ -29,6 +29,7 @@ LICENSE
 
 require "addressable/uri"
 require "socket"
+require "openssl"
 
 class ShoutBot
   def self.shout(uri, password = nil, ssl = false, &block)
