@@ -48,24 +48,31 @@ class ShoutBot
 
   attr_accessor :channel
 
+  def sendln(cmd)
+    puts "Send: #{cmd}"
+    @socket.write("#{cmd}\r\n")
+    STDOUT.flush
+  end
+
   def initialize(server, port, nick, password = nil, ssl)
     raise ArgumentError unless block_given?
 
+    tcp_socket = TCPSocket.new(server, port || 6667)
     if ssl
       ssl_context = OpenSSL::SSL::SSLContext.new
       ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
-      tcp_socket = TCPSocket.new(server, port || 6667)
       @socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
+      @socket.sync = true
       @socket.connect
     else
-      @socket = TCPSocket.open(server, port || 6667)
+      @socket = tcp_socket
     end
-    @socket.puts "PASSWORD #{password}" if password
-    @socket.puts "NICK #{nick}"
-    @socket.puts "USER #{nick} #{nick} #{nick} :#{nick}"
+    sendln "PASS #{password}" if password
+    sendln "NICK #{nick}"
+    sendln "USER #{nick} 0 * :#{nick}"
     sleep 1
     yield self
-    @socket.puts "QUIT"
+    sendln "QUIT :quit"
     @socket.gets until @socket.eof?
   end
 
@@ -74,13 +81,13 @@ class ShoutBot
 
     @channel = "##{channel}"
     password = password && " #{password}" || ""
-    @socket.puts "JOIN #{@channel}#{password}"
+    sendln "JOIN #{@channel}#{password}"
     yield self
-    @socket.puts "PART #{@channel}"
+    sendln "PART #{@channel}"
   end
 
   def say(message)
     return unless @channel
-    @socket.puts "PRIVMSG #{@channel} :#{message}"
+    sendln "PRIVMSG #{@channel} :#{message}"
   end
 end
