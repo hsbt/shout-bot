@@ -49,7 +49,6 @@ class ShoutBot
   attr_accessor :channel
 
   def sendln(cmd)
-    puts "Send: #{cmd}"
     @socket.write("#{cmd}\r\n")
     STDOUT.flush
   end
