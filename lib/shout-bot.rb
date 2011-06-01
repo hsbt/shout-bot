@@ -54,7 +54,7 @@ class ShoutBot
     STDOUT.flush
   end
 
-  def initialize(server, port, nick, password = nil, ssl)
+  def initialize(server, port, nick, password, ssl)
     raise ArgumentError unless block_given?
 
     tcp_socket = TCPSocket.new(server, port || 6667)
