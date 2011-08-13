@@ -29,15 +29,16 @@ LICENSE
 
 require "addressable/uri"
 require "socket"
+require "openssl"
 
 class ShoutBot
-  def self.shout(uri, &block)
+  def self.shout(uri, password = nil, ssl = false, &block)
     raise ArgumentError unless block_given?
 
     uri = Addressable::URI.parse(uri)
-    irc = new(uri.host, uri.port, uri.user, uri.password) do |irc|
+    irc = new(uri.host, uri.port, uri.user, uri.password, ssl) do |irc|
       if channel = uri.fragment
-        irc.join(channel, &block)
+        irc.join(channel, password, &block)
       else
         irc.channel = uri.path[1..-1]
         yield irc
@@ -47,31 +48,46 @@ class ShoutBot
 
   attr_accessor :channel
 
-  def initialize(server, port, nick, password=nil)
+  def sendln(cmd)
+    @socket.write("#{cmd}\r\n")
+    STDOUT.flush
+  end
+
+  def initialize(server, port, nick, password, ssl)
     raise ArgumentError unless block_given?
 
-    @socket = TCPSocket.open(server, port || 6667)
-    @socket.puts "PASSWORD #{password}" if password
-    @socket.puts "NICK #{nick}"
-    @socket.puts "USER #{nick} #{nick} #{nick} :#{nick}"
+    tcp_socket = TCPSocket.new(server, port || 6667)
+    if ssl
+      ssl_context = OpenSSL::SSL::SSLContext.new
+      ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      @socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
+      @socket.sync = true
+      @socket.connect
+    else
+      @socket = tcp_socket
+    end
+    sendln "PASS #{password}" if password
+    sendln "NICK #{nick}"
+    sendln "USER #{nick} 0 * :#{nick}"
     sleep 1
     yield self
-    @socket.puts "QUIT"
+    sendln "QUIT :quit"
     @socket.gets until @socket.eof?
   end
 
-  def join(channel)
+  def join(channel, password)
     raise ArgumentError unless block_given?
 
     @channel = "##{channel}"
-    @socket.puts "JOIN #{@channel}"
+    password = password && " #{password}" || ""
+    sendln "JOIN #{@channel}#{password}"
     yield self
-    @socket.puts "PART #{@channel}"
+    sendln "PART #{@channel}"
   end
 
   def say(message)
     return unless @channel
-    @socket.puts "PRIVMSG #{@channel} :#{message}"
+    sendln "PRIVMSG #{@channel} :#{message}"
   end
 
   def notice(message)
