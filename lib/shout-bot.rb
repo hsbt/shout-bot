@@ -92,6 +92,6 @@ class ShoutBot
 
   def notice(message)
     return unless @channel
-    @socket.puts "NOTICE #{@channel} :#{message}"
+    sendln "NOTICE #{@channel} :#{message}"
   end
 end
